@@ -6,6 +6,41 @@ import { fileURLToPath } from "url";
 import yargs from "yargs";
 import chalk from "chalk";
 
+const readCnabFile = async (file) => {
+  try {
+    const content = await readFile(file, "utf8");
+    return content.split("\n");
+  } catch (error) {
+    console.error(error);
+    throw new Error("error while reading file");
+  }
+};
+
+const segmentPosition = 13;
+
+const filterBySegment = (cnabBody, segment) =>
+  cnabBody.filter((line) => line.charAt(segmentPosition) === segment);
+
+const messageLogHeader = (
+  segmentType,
+  from,
+  to
+) => `----- Cnab linha ${segmentType} -----
+
+posição from: ${chalk.inverse.bgBlack(from)}
+posição to: ${chalk.inverse.bgBlack(to)}`;
+
+const messageLogFooter = () => `----- FIM ------`;
+
+const messageLog = (lines, from, to) => `
+item isolado: ${chalk.inverse.bgBlack(lines.substring(from - 1, to))}
+
+item dentro da linha P:
+  ${lines.substring(0, from)}${chalk.inverse.bgBlack(
+  lines.substring(from - 1, to)
+)}${lines.substring(to)}
+`;
+
 const optionsYargs = yargs(process.argv.slice(2))
   .usage("Uso: $0 [options]")
   .option("f", {
@@ -54,81 +89,38 @@ if (path) {
   );
 }
 
-// process.exit(0);
-
-const sliceArrayPosition = (arr, ...positions) => [...arr].slice(...positions);
-
-const messageLogHeader = (segmentType, from, to) => `----- Cnab linha ${segmentType} -----
-
-posição from: ${chalk.inverse.bgBlack(from)}
-posição to: ${chalk.inverse.bgBlack(to)}`;
-
-const messageLogFooter = () => `----- FIM ------`;
-
-const messageLog = (lines, from, to) => `
-item isolado: ${chalk.inverse.bgBlack(lines.substring(from - 1, to))}
-
-item dentro da linha P: 
-  ${lines.substring(0, from)}${chalk.inverse.bgBlack(
-  lines.substring(from - 1, to)
-)}${lines.substring(to)}
-`;
-
-// const messageLog = (lines, segmentType, from, to) => `
-// ----- Cnab linha ${segmentType} -----
-
-// posição from: ${chalk.inverse.bgBlack(from)}
-
-// posição to: ${chalk.inverse.bgBlack(to)}
-
-// item isolado: ${chalk.inverse.bgBlack(lines.substring(from - 1, to))}
-
-// item dentro da linha P:
-//   ${lines.substring(0, from)}${chalk.inverse.bgBlack(
-//   lines.substring(from - 1, to)
-// )}${lines.substring(to)}
-
-// ----- FIM ------
-// `;
-
 const log = console.log;
 
 console.time("leitura Async");
 
-readFile(file, "utf8")
-  .then((file) => {
-    const cnabArray = file.split("\n");
+try {
+  const cnabArray = await readCnabFile(file);
 
-    // const cnabHeader = cnabArray.slice(0, 2);
+  // const cnabHeader = cnabArray.slice(0, 2);
+  const cnabBody = cnabArray.slice(2, cnabArray.length - 2);
 
-    const cnabBody = cnabArray.slice(2, cnabArray.length - 2);
+  const cnabBodySegmentsP = filterBySegment(cnabBody, "P");
+  const cnabBodySegmentsQ = filterBySegment(cnabBody, "Q");
+  const cnabBodySegmentsR = filterBySegment(cnabBody, "R");
 
-    const segmentPosition = 13;
-
-    const filterBySegment = (segment) =>
-      cnabBody.filter((line) => line.charAt(segmentPosition) === segment);
-
-    const cnabBodySegmentsP = filterBySegment("P");
-    const cnabBodySegmentsQ = filterBySegment("Q");
-    const cnabBodySegmentsR = filterBySegment("R");
-
-    const getLinesBySegment = (segment) => {
-      const segmentMapper = {
-        p: cnabBodySegmentsP,
-        q: cnabBodySegmentsQ,
-        r: cnabBodySegmentsR,
-      };
-      return segmentMapper[segment] || [];
+  const getLinesBySegment = (segment) => {
+    const segmentMapper = {
+      p: cnabBodySegmentsP,
+      q: cnabBodySegmentsQ,
+      r: cnabBodySegmentsR,
     };
+    return segmentMapper[segment] || [];
+  };
 
-    const lines = getLinesBySegment(segmento);
-    log(messageLogHeader(segmento, from, to));
-    lines.map((line) => {
-      log(messageLog(line, from, to));
-    });
-    log(messageLogFooter());
-  })
-  .catch((error) => {
-    console.log("🚀 ~ file: cnabRows.js ~ line 76 ~ error", error);
+  const lines = getLinesBySegment(segmento);
+
+  log(messageLogHeader(segmento, from, to));
+  lines.map((line) => {
+    log(messageLog(line, from, to));
   });
+  log(messageLogFooter());
+} catch (error) {
+  console.error(error);
+}
+
 console.timeEnd("leitura Async");
